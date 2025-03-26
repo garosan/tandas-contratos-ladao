@@ -1,37 +1,40 @@
 // SPDX-License-Identifier: BSD 3-Clause License
 pragma solidity ^0.8.28;
 
-import "./SavingGroups.sol";
+import "./SavingsGroupsWithRewards.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract Main {
 
     address public immutable devFund;
     uint256 public fee = 5;
     
-    event RoundCreated(SavingGroups childRound);
+    event RoundCreated(SavingsGroupsWithRewards childRound);
 
     constructor(address _devFund) public {
         require(_devFund != address(0), "Invalid dev fund address");
         devFund = _devFund;
     }
 
-    function createRound(   uint256 _warranty,
-                            uint256 _saving,
-                            uint256 _groupSize,
-                            uint256 _adminFee,
-                            uint256 _payTime,
-                            ERC20 _token
-                        ) external payable returns(address) {
-        SavingGroups newRound = new SavingGroups(   _warranty,
-                                                    _saving,
-                                                    _groupSize,
-                                                    msg.sender,
-                                                    _adminFee,
-                                                    _payTime,
-                                                    _token,
-                                                    devFund,
-                                                    fee
-                                                );
+    function createRound(   
+        uint256 _warranty,
+        uint256 _saving,
+        uint256 _groupSize,
+        uint256 _adminFee,
+        uint256 _payTime,
+        ERC20 _token
+    ) external payable returns(address) {
+        SavingsGroupsWithRewards newRound = new SavingsGroupsWithRewards(   
+            _warranty,
+            _saving,
+            _groupSize,
+            msg.sender,
+            _adminFee,
+            _payTime,
+            _token,
+            devFund,
+            fee
+        );
         emit RoundCreated(newRound);
         return address(newRound);
     }

@@ -337,6 +337,10 @@ contract SavingGroups is Modifiers {
         turn++;
     }
 
+    function _completeSavingsAndAdvanceTurn(uint8 turno) internal {
+        completeSavingsAndAdvanceTurn(turno);
+    }
+
     function payLateFromSavings(address _userAddress) internal {
         if (users[_userAddress].availableSavings >= users[_userAddress].owedTotalCashIn){
             users[_userAddress].availableSavings -= users[_userAddress].owedTotalCashIn;
@@ -375,7 +379,7 @@ contract SavingGroups is Modifiers {
         emit EmergencyWithdraw(address(this), saldoAtorado);
     }
 
-    function endRound() public atStage(Stages.Save) {
+    function endRound() public virtual atStage(Stages.Save) {
         require(getRealTurn() > groupSize, "No ha terminado la ronda");
         for (uint8 turno = turn; turno <= groupSize; turno++) {
             completeSavingsAndAdvanceTurn(turno);

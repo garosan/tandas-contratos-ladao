@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
+import "hardhat/console.sol";
 /**
  * @title RewardsVault
  * @notice This vault accepts deposits of any ERC20 token (e.g. $OP, WETH, or in our case $XOC)
@@ -27,6 +27,8 @@ contract RewardsVault {
      * @notice Constructor sets the vault admin to the contract that deploys this vault.
      */
     constructor() {
+        console.log("RewardsVault constructor", msg.sender);
+        console.log("RewardsVault Contract", address(this));
         admin = msg.sender;
     }
     
