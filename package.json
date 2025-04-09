@@ -10,9 +10,12 @@
   "description": "",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
-    "hardhat": "^2.22.18"
+    "hardhat": "^2.22.18",
+    "hardhat-contract-sizer": "^2.10.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.2.0"
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "@openzeppelin/contracts": "^5.2.0",
+    "dotenv": "^16.4.7"
   }
 }
