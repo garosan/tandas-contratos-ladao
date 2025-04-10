@@ -5,6 +5,26 @@ import "./Modifiers.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+error SavingGroups__ZeroAddress();
+error SavingGroups__InvalidGroupSize();
+error SavingGroups__CashInTooLow();
+error SavingGroups__SaveAmountTooLow();
+error SavingGroups__AdminFeeTooHigh();
+error SavingGroups__DuplicateTurn();
+error SavingGroups__UserAlreadyRegistered();
+error SavingGroups__GroupIsFull();
+error SavingGroups__InvalidStage();
+error SavingGroups__PayTimeTooLow();
+error SavingGroups__CantDeleteUser();
+error SavingGroups__CantDeleteAdmin();
+error SavingGroups__IncorrectPayment();
+error SavingGroups__UnassignedSpotsAvailable();
+error SavingGroups__TurnAlreadyTaken();
+error SavingGroups__TurnIsNotTaken();
+error SavingGroups__NoBalanceToWithdraw();
+error SavingGroups__NotYourTurnYet();
+error SavingGroups__RoundIsNotOver();
+
 contract SavingGroups is Modifiers {
     enum Stages {
         Setup,
@@ -53,7 +73,7 @@ contract SavingGroups is Modifiers {
     uint256 public feeCost = 0;
     IERC20Metadata public XOC; // 0x874069fa1eb16d44d622f2e0ca25eea172369bc1
 
-    // BloinxEvents
+    // Events
     event RoundCreated(uint256 indexed saveAmount, uint256 indexed groupSize);
     event RegisterUser(address indexed user, uint8 indexed turn);
     event PayCashIn(address indexed user, bool indexed success);
@@ -92,20 +112,14 @@ contract SavingGroups is Modifiers {
         uint256 _fee
     ) {
         XOC = _token;
-        require(
-            _admin != address(0),
-            "La direccion del administrador no puede ser cero"
-        );
+        require(_admin != address(0), SavingGroups__ZeroAddress());
         require(
             _groupSize > 1 && _groupSize <= 12,
-            "El tamanio del grupo debe ser mayor a uno y menor o igual a 12"
+            SavingGroups__InvalidGroupSize()
         );
-        require(
-            _cashIn >= 5,
-            "El deposito de seguridad debe ser minimo de 5cUSD"
-        );
-        require(_saveAmount >= 5, "El pago debe ser minimo de 5cUSD");
-        require(_adminFee <= 100);
+        require(_cashIn >= 5, SavingGroups__CashInTooLow());
+        require(_saveAmount >= 5, SavingGroups__SaveAmountTooLow());
+        require(_adminFee <= 100, SavingGroups__AdminFeeTooHigh());
         admin = _admin;
         adminFee = _adminFee;
         groupSize = _groupSize;
@@ -114,29 +128,26 @@ contract SavingGroups is Modifiers {
         saveAmount = _saveAmount * 10 ** 18;
         stage = Stages.Setup;
         addressOrderList = new address[](_groupSize);
-        require(
-            _payTime > 0,
-            "El tiempo para pagar no puede ser menor a un dia"
-        );
+        require(_payTime > 0, SavingGroups__PayTimeTooLow());
         payTime = _payTime * 86400;
         feeCost = (saveAmount * 100 * _fee) / 10000; // calculate 5% fee
         emit RoundCreated(saveAmount, groupSize);
     }
 
     modifier atStage(Stages _stage) {
-        require(stage == _stage, "Stage incorrecto para ejecutar la funcion");
+        require(stage == _stage, SavingGroups__InvalidStage());
         _;
     }
 
     function registerUser(uint8 _userTurn) external atStage(Stages.Setup) {
         require(
             !users[msg.sender].isActive,
-            "Ya estas registrado en esta ronda"
+            SavingGroups__UserAlreadyRegistered()
         );
-        require(usersCounter < groupSize, "El grupo esta completo"); //the saving circle is full
+        require(usersCounter < groupSize, SavingGroups__GroupIsFull());
         require(
             addressOrderList[_userTurn - 1] == address(0),
-            "Este lugar ya esta ocupado"
+            SavingGroups__TurnAlreadyTaken()
         );
         usersCounter++;
         users[msg.sender] = User(
@@ -164,15 +175,15 @@ contract SavingGroups is Modifiers {
         require(
             msg.sender == admin ||
                 msg.sender == addressOrderList[_userTurn - 1],
-            "No tienes autorizacion para eliminar a este usuario"
+            SavingGroups__CantDeleteUser()
         );
         require(
             addressOrderList[_userTurn - 1] != address(0),
-            "Este turno esta vacio"
+            SavingGroups__TurnIsNotTaken()
         );
         require(
             admin != addressOrderList[_userTurn - 1],
-            "No puedes eliminar al administrador de la ronda"
+            SavingGroups__CantDeleteAdmin()
         );
         address removeAddress = addressOrderList[_userTurn - 1];
         if (users[removeAddress].availableCashIn > 0) {
@@ -189,7 +200,10 @@ contract SavingGroups is Modifiers {
     }
 
     function startRound() external onlyAdmin(admin) atStage(Stages.Setup) {
-        require(usersCounter == groupSize, "Aun hay lugares sin asignar");
+        require(
+            usersCounter == groupSize,
+            SavingGroups__UnassignedSpotsAvailable()
+        );
         stage = Stages.Save;
         startTime = block.timestamp;
     }
@@ -209,7 +223,7 @@ contract SavingGroups is Modifiers {
         //users make the payment for the cycle
         require(
             _payAmount <= futurePayments() && _payAmount > 0,
-            "Pago incorrecto"
+            SavingGroups__IncorrectPayment()
         );
 
         //First transaction that will complete saving of currentTurn and will trigger next turn
@@ -296,7 +310,7 @@ contract SavingGroups is Modifiers {
         uint8 senderTurn = users[msg.sender].userTurn;
 
         uint8 realTurn = getRealTurn();
-        require(realTurn > senderTurn, "Espera a llegar a tu turno"); //turn = turno actual de la rosca
+        require(realTurn > senderTurn, SavingGroups__NotYourTurnYet()); //turn = turno actual de la rosca
         require(users[msg.sender].withdrewAmount == 0);
         //First transaction that will complete saving of currentTurn and will trigger next turn
         //Because this runs each user action, we are sure the user in turn has its availableSavings complete
@@ -424,7 +438,10 @@ contract SavingGroups is Modifiers {
     }
 
     function emergencyWithdraw() public atStage(Stages.Emergency) {
-        require(XOC.balanceOf(address(this)) > 0, "No hay saldo por retirar");
+        require(
+            XOC.balanceOf(address(this)) > 0,
+            SavingGroups__NoBalanceToWithdraw()
+        );
         for (uint8 turno = turn; turno <= groupSize; turno++) {
             completeSavingsAndAdvanceTurn(turno);
         }
@@ -451,7 +468,7 @@ contract SavingGroups is Modifiers {
     }
 
     function endRound() public atStage(Stages.Save) {
-        require(getRealTurn() > groupSize, "No ha terminado la ronda");
+        require(getRealTurn() > groupSize, SavingGroups__RoundIsNotOver());
         for (uint8 turno = turn; turno <= groupSize; turno++) {
             completeSavingsAndAdvanceTurn(turno);
         }

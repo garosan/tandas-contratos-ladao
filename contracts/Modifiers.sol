@@ -2,14 +2,16 @@
 pragma solidity ^0.8.28;
 
 abstract contract Modifiers {
+    error NotAdmin();
+    error UserNotRegistered();
+
     modifier onlyAdmin(address admin) {
-        require(msg.sender == admin, "Solo el admin puede llamar la funcion");
+        if (msg.sender != admin) revert NotAdmin();
         _;
     }
 
     modifier isRegisteredUser(bool user) {
-        //Verifies if it is the users round to widraw
-        require(user == true, "Usuario no registrado");
+        if (!user) revert UserNotRegistered();
         _;
     }
 }
