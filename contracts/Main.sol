@@ -19,7 +19,7 @@ contract Main {
     function createRound(
         uint256 _warranty,
         uint256 _saving,
-        uint256 _groupSize,
+        uint16 _groupSize,
         uint256 _adminFee,
         uint256 _payTime,
         IERC20Metadata _token

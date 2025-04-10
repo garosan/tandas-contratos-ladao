@@ -53,7 +53,7 @@ contract SavingGroups is Modifiers {
     //Constructor deployment variables
     uint256 public cashIn; //amount to be payed as commitment at the begining of the saving circle
     uint256 public saveAmount; //Payment on each round/cycle
-    uint256 public groupSize; //Number of slots for users to participate on the saving circle
+    uint16 public groupSize; //Number of slots for users to participate on the saving circle
     uint256 public adminFee; //The fee the admin will charge to the users, it will be taken from the users cashin
     address public devFund; // fees will be sent here
 
@@ -103,7 +103,7 @@ contract SavingGroups is Modifiers {
     constructor(
         uint256 _cashIn,
         uint256 _saveAmount,
-        uint256 _groupSize,
+        uint16 _groupSize,
         address _admin,
         uint256 _adminFee,
         uint256 _payTime,
@@ -220,6 +220,7 @@ contract SavingGroups is Modifiers {
         isRegisteredUser(users[msg.sender].isActive)
         atStage(Stages.Save)
     {
+        User storage sender = users[msg.sender];
         //users make the payment for the cycle
         require(
             _payAmount <= futurePayments() && _payAmount > 0,
@@ -234,7 +235,7 @@ contract SavingGroups is Modifiers {
 
         address userInTurn = addressOrderList[turn - 1];
         uint256 deposit = _payAmount;
-        users[msg.sender].unassignedPayments += deposit;
+        sender.unassignedPayments += deposit;
 
         uint256 obligation = obligationAtTime(msg.sender);
         uint256 debtToTurn;
@@ -244,12 +245,12 @@ contract SavingGroups is Modifiers {
 
         //checking debt in current turn:
 
-        if (obligation <= users[msg.sender].assignedPayments) {
+        if (obligation <= sender.assignedPayments) {
             //no hay deuda del turno corriente
             debtToTurn = 0;
         } else {
             //hay deuda del turno corriente
-            debtToTurn = obligation - users[msg.sender].assignedPayments;
+            debtToTurn = obligation - sender.assignedPayments;
 
             //checking debt in Total CashIn: (owedTotalCashIn)
 
@@ -263,40 +264,32 @@ contract SavingGroups is Modifiers {
                 }
 
                 //Si no he cubierto todos mis pagos hasta el día se asignan al usuario en turno.
-                users[msg.sender].unassignedPayments -= paymentToTurn;
+                sender.unassignedPayments -= paymentToTurn;
                 users[userInTurn].availableSavings += paymentToTurn;
-                users[msg.sender].assignedPayments += paymentToTurn;
+                sender.assignedPayments += paymentToTurn;
             }
         }
 
         //PAGO DEUDA DEL CASHIN TOTAL
-        if (
-            users[msg.sender].owedTotalCashIn > 0 &&
-            users[msg.sender].unassignedPayments > 0
-        ) {
+        if (sender.owedTotalCashIn > 0 && sender.unassignedPayments > 0) {
             uint256 paymentTotalCashIn;
             //unnasigned excede o iguala la deuda del cashIn
-            if (
-                users[msg.sender].owedTotalCashIn <=
-                users[msg.sender].unassignedPayments
-            ) {
-                paymentTotalCashIn = users[msg.sender].owedTotalCashIn;
+            if (sender.owedTotalCashIn <= sender.unassignedPayments) {
+                paymentTotalCashIn = sender.owedTotalCashIn;
             } else {
-                paymentTotalCashIn = users[msg.sender].unassignedPayments; //cubre parcialmente la deuda del cashIn
+                paymentTotalCashIn = sender.unassignedPayments; //cubre parcialmente la deuda del cashIn
             }
 
-            users[msg.sender].unassignedPayments -= paymentTotalCashIn;
+            sender.unassignedPayments -= paymentTotalCashIn;
             totalCashIn = totalCashIn + paymentTotalCashIn;
-            users[msg.sender].owedTotalCashIn -= paymentTotalCashIn;
+            sender.owedTotalCashIn -= paymentTotalCashIn;
         }
 
         //update my own availableCashIn
-        if (users[msg.sender].owedTotalCashIn < cashIn) {
-            users[msg.sender].availableCashIn =
-                cashIn -
-                users[msg.sender].owedTotalCashIn;
+        if (sender.owedTotalCashIn < cashIn) {
+            sender.availableCashIn = cashIn - sender.owedTotalCashIn;
         } else {
-            users[msg.sender].availableCashIn = 0;
+            sender.availableCashIn = 0;
         }
         bool success = transferFrom(address(this), _payAmount);
         emit PayTurn(msg.sender, success);
@@ -307,11 +300,12 @@ contract SavingGroups is Modifiers {
         isRegisteredUser(users[msg.sender].isActive)
         atStage(Stages.Save)
     {
-        uint8 senderTurn = users[msg.sender].userTurn;
+        User storage sender = users[msg.sender];
+        uint8 senderTurn = sender.userTurn;
 
         uint8 realTurn = getRealTurn();
         require(realTurn > senderTurn, SavingGroups__NotYourTurnYet()); //turn = turno actual de la rosca
-        require(users[msg.sender].withdrewAmount == 0);
+        require(sender.withdrewAmount == 0);
         //First transaction that will complete saving of currentTurn and will trigger next turn
         //Because this runs each user action, we are sure the user in turn has its availableSavings complete
         if (turn < realTurn) {
@@ -319,20 +313,16 @@ contract SavingGroups is Modifiers {
         }
 
         // Paga adeudos pendientes de availableSavings
-        if (obligationAtTime(msg.sender) > users[msg.sender].assignedPayments) {
+        if (obligationAtTime(msg.sender) > sender.assignedPayments) {
             payLateFromSavings(msg.sender);
         }
 
         uint256 savedAmountTemp = 0;
-        savedAmountTemp = users[msg.sender].availableSavings;
-        users[msg.sender].availableSavings = 0;
-        users[msg.sender].withdrewAmount += savedAmountTemp;
-        bool success = transferTo(users[msg.sender].userAddr, savedAmountTemp);
-        emit WithdrawFunds(
-            users[msg.sender].userAddr,
-            savedAmountTemp,
-            success
-        );
+        savedAmountTemp = sender.availableSavings;
+        sender.availableSavings = 0;
+        sender.withdrewAmount += savedAmountTemp;
+        bool success = transferTo(sender.userAddr, savedAmountTemp);
+        emit WithdrawFunds(sender.userAddr, savedAmountTemp, success);
         if (outOfFunds) {
             stage = Stages.Emergency;
         }
